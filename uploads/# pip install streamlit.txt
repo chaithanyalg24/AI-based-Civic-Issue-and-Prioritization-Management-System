@@ -1,0 +1,13 @@
+# pip install streamlit
+import streamlit as st
+import pandas as pd
+
+data = {
+    'Name': ['Abdul Aziz', 'Anna', 'Bob', 'Peter'],
+    'Age': [28, 24, 35, 32],
+    'City': ['India', 'Paris', 'Berlin', 'London']
+}
+
+df = pd.DataFrame(data)
+
+st.dataframe(df)  # Interactive table

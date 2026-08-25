@@ -1,0 +1,12 @@
+Complaint_ID,Citizen_Name,Location,Description,Issue,Department,Priority,Priority_Score,Image,Status,AI_Confidence,Submitted_At
+CIVIC-2026-5162,Kannika M S,Mysore,There is a large pothole on the road. It is dangerous and may cause an accident.,pothole,Road Department,Critical,9.0,uploads\pothole1.jpg,In Progress,,
+CIVIC-2026-9098,Sneha M S,T Narsipura,In our area there is a huge garbage which is not disposed properly,garbage,Waste Management Department,Low,1.0,uploads\garbage2.jpg,In Progress,,
+CIVIC-2026-3858,Chaithu,Mysore,In our area we faces frequent drainage blockages and overflowing drains due to rain,garbage,Waste Management Department,Low,1.0,uploads\drainage2.jpg,Pending,,
+CIVIC-2026-4689,Thanu,Mandya,"There is a large pothole on the main road near the college. It is causing difficulty for vehicles and may lead to accidents, especially during heavy traffic.",pothole,Road Department,High,5.0,uploads\pothole1.jpg,In Progress,,
+CIVIC-2026-8120,Sneha M S,T Narsipura,There is a large pothole on the road causing difficulty for vehicles.,pothole,Road Department,Medium,69.0,,In Progress,60.0,2026-08-25 09:37:42
+CIVIC-2026-7536,Chinmay,Banglorer,There is a huge traffic as traffic light is not working properly ,traffic_signal,Traffic Department,High,96.25,,Resolved,75.0,2026-08-25 09:54:24
+CIVIC-2026-5922,Devika,Kollegala,there is a tree fell down on the road due to heavy rain,fallen_tree,Parks and Garden Department,High,98.12,,In Progress,87.5,2026-08-25 10:47:47
+CIVIC-2026-5752,kannika,mysore,there is a hole near our college,pothole,Road Department,High,95.8,,Pending,72.0,2026-08-25 11:06:53
+CIVIC-2026-7783,kannika,mysore,there is a hole near our college,pothole,Road Department,High,95.8,,Pending,72.0,2026-08-25 11:06:57
+CIVIC-2026-3290,Kavana,Mysore,There a tree fallen near the road due to heavy rain,pothole,Road Department,Medium,63.45,,Pending,23.0,2026-08-25 11:22:12
+CIVIC-2026-9990,Arun,Banglore,There is heavy traffic on way to office due to traffic signal is not working,traffic_signal,Traffic Department,High,96.25,,In Progress,75.0,2026-08-25 11:31:38
