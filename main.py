@@ -19,39 +19,8 @@ st.set_page_config(
     layout="wide"
 )
 
-
-# =========================================================
-# FILE SETTINGS
-# =========================================================
-
 MODEL_PATH = "image_civic_model.pkl"
 CSV_PATH = "complaints.csv"
-
-
-# =========================================================
-# PAGE STYLE
-# =========================================================
-
-st.markdown(
-    """
-    <style>
-
-    .main-title {
-        font-size: 40px;
-        font-weight: bold;
-        text-align: center;
-    }
-
-    .subtitle {
-        text-align: center;
-        font-size: 18px;
-        margin-bottom: 25px;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 
 # =========================================================
@@ -61,10 +30,10 @@ st.markdown(
 @st.cache_resource
 def load_model():
 
-    if not os.path.exists(MODEL_PATH):
-        return None
+    if os.path.exists(MODEL_PATH):
+        return joblib.load(MODEL_PATH)
 
-    return joblib.load(MODEL_PATH)
+    return None
 
 
 model = load_model()
@@ -76,19 +45,16 @@ model = load_model()
 
 def extract_features(image):
 
-    # Resize image
     image = cv2.resize(
         image,
         (128, 128)
     )
 
-    # Convert to grayscale
     gray = cv2.cvtColor(
         image,
         cv2.COLOR_BGR2GRAY
     )
 
-    # HOG features
     hog_features = hog(
         gray,
         orientations=9,
@@ -97,7 +63,6 @@ def extract_features(image):
         block_norm="L2-Hys"
     )
 
-    # Convert to HSV
     hsv = cv2.cvtColor(
         image,
         cv2.COLOR_BGR2HSV
@@ -119,7 +84,6 @@ def extract_features(image):
         color_features
     )
 
-    # Combine features
     features = np.concatenate(
         [
             hog_features,
@@ -131,7 +95,7 @@ def extract_features(image):
 
 
 # =========================================================
-# AI PREDICTION
+# PREDICT CIVIC ISSUE
 # =========================================================
 
 def predict_issue(image):
@@ -149,14 +113,21 @@ def predict_issue(image):
         -1
     )
 
-    # Check feature count
-    if features.shape[1] != model.n_features_in_:
+    expected_features = (
+        model.n_features_in_
+    )
+
+    actual_features = (
+        features.shape[1]
+    )
+
+    if actual_features != expected_features:
 
         raise ValueError(
             f"Feature mismatch. "
-            f"Model expects {model.n_features_in_} "
+            f"Model expects {expected_features} "
             f"features but application generated "
-            f"{features.shape[1]} features."
+            f"{actual_features}."
         )
 
     prediction = model.predict(
@@ -167,8 +138,9 @@ def predict_issue(image):
         features
     )[0]
 
-    confidence = float(
-        np.max(probabilities) * 100
+    confidence = (
+        float(np.max(probabilities))
+        * 100
     )
 
     return prediction, confidence
@@ -220,7 +192,6 @@ def calculate_priority(
 ):
 
     high_priority = [
-
         "pothole",
         "water_leak",
         "fallen_tree",
@@ -228,7 +199,6 @@ def calculate_priority(
     ]
 
     medium_priority = [
-
         "garbage",
         "streetlight",
         "drainage"
@@ -237,11 +207,12 @@ def calculate_priority(
     if issue in high_priority:
 
         if confidence >= 70:
+
             return "High"
 
         return "Medium"
 
-    elif issue in medium_priority:
+    if issue in medium_priority:
 
         return "Medium"
 
@@ -257,7 +228,7 @@ def calculate_priority_score(
     confidence
 ):
 
-    base_scores = {
+    scores = {
 
         "Low": 30,
 
@@ -266,12 +237,12 @@ def calculate_priority_score(
         "High": 85
     }
 
-    base = base_scores.get(
+    score = scores.get(
         priority,
         30
     )
 
-    score = base + (
+    score += (
         confidence * 0.15
     )
 
@@ -282,31 +253,56 @@ def calculate_priority_score(
 
 
 # =========================================================
-# GENERATE COMPLAINT ID
+# COMPLAINT ID
 # =========================================================
 
 def generate_complaint_id():
 
     year = datetime.now().year
 
-    number = random.randint(
-        1000,
-        9999
-    )
+    while True:
 
-    return (
-        f"CIVIC-{year}-{number}"
-    )
+        number = random.randint(
+            1000,
+            9999
+        )
+
+        complaint_id = (
+            f"CIVIC-{year}-{number}"
+        )
+
+        if os.path.exists(CSV_PATH):
+
+            existing = pd.read_csv(
+                CSV_PATH
+            )
+
+            if (
+                "Complaint_ID"
+                in existing.columns
+            ):
+
+                if complaint_id in (
+                    existing["Complaint_ID"]
+                    .astype(str)
+                    .values
+                ):
+
+                    continue
+
+        return complaint_id
 
 
 # =========================================================
 # SAVE COMPLAINT
 # =========================================================
 
-def save_complaint(data):
+def save_complaint(
+    complaint_data
+):
 
     new_data = pd.DataFrame(
-        [data]
+        [complaint_data]
     )
 
     if os.path.exists(CSV_PATH):
@@ -334,26 +330,6 @@ def save_complaint(data):
 
 
 # =========================================================
-# HEADER
-# =========================================================
-
-st.markdown(
-    '<div class="main-title">'
-    '🏙️ AI Civic Issue Management System'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    '<div class="subtitle">'
-    'AI-Based Civic Issue Detection, Prioritization '
-    'and Complaint Management'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-# =========================================================
 # SIDEBAR
 # =========================================================
 
@@ -362,11 +338,11 @@ st.sidebar.title(
 )
 
 st.sidebar.write(
-    "Navigation"
+    "Select Page"
 )
 
 page = st.sidebar.radio(
-    "Select Page",
+    "Navigation",
     [
         "🏠 Home",
         "📝 Submit Complaint",
@@ -383,16 +359,22 @@ page = st.sidebar.radio(
 
 if page == "🏠 Home":
 
-    st.header(
-        "Welcome to AI Civic Issue Management System"
+    st.title(
+        "🏙️ AI Civic Issue Management System"
+    )
+
+    st.subheader(
+        "AI-Based Civic Issue Detection and Prioritization"
     )
 
     st.write(
         """
-        This system allows citizens to report civic issues
-        using images and descriptions. The AI model identifies
-        the issue, calculates its priority and automatically
-        assigns the complaint to the appropriate department.
+        Welcome to the AI Civic Issue Management System.
+
+        This platform allows citizens to report civic
+        problems using images. The AI model identifies
+        the issue, calculates its priority and assigns
+        it to the appropriate department.
         """
     )
 
@@ -402,29 +384,35 @@ if page == "🏠 Home":
 
     with col1:
 
-        st.subheader("📝 Report")
+        st.subheader(
+            "📝 Submit Complaint"
+        )
 
         st.write(
-            "Citizens can submit civic complaints "
-            "with an image."
+            "Citizens can submit civic issues "
+            "with images."
         )
 
     with col2:
 
-        st.subheader("🤖 AI Detection")
+        st.subheader(
+            "🤖 AI Detection"
+        )
 
         st.write(
-            "Machine learning identifies the type "
-            "of civic problem."
+            "AI identifies the type of civic issue "
+            "and calculates priority."
         )
 
     with col3:
 
-        st.subheader("🔎 Track")
+        st.subheader(
+            "🔎 Track Complaint"
+        )
 
         st.write(
-            "Citizens can track their complaint "
-            "using the Complaint ID."
+            "Citizens can track complaints using "
+            "their Complaint ID."
         )
 
     st.divider()
@@ -433,40 +421,34 @@ if page == "🏠 Home":
         "🚧 Supported Civic Issues"
     )
 
-    issues = [
+    st.write(
+        """
+        🕳️ Pothole
 
-        "🕳️ Pothole",
+        🗑️ Garbage
 
-        "🗑️ Garbage",
+        💡 Streetlight
 
-        "💡 Streetlight",
+        💧 Water Leak
 
-        "💧 Water Leak",
+        🚰 Drainage
 
-        "🚰 Drainage",
+        🌳 Fallen Tree
 
-        "🌳 Fallen Tree",
-
-        "🚦 Traffic Signal"
-    ]
-
-    for issue in issues:
-
-        st.write(issue)
-
-    st.divider()
+        🚦 Traffic Signal
+        """
+    )
 
     if model is not None:
 
         st.success(
-            f"🤖 AI Model loaded successfully. "
-            f"Features: {model.n_features_in_}"
+            "🤖 AI model loaded successfully."
         )
 
     else:
 
         st.error(
-            "❌ AI model not found."
+            "❌ image_civic_model.pkl not found."
         )
 
 
@@ -476,23 +458,20 @@ if page == "🏠 Home":
 
 elif page == "📝 Submit Complaint":
 
-    st.header(
-        "📝 Submit a Civic Complaint"
+    st.title(
+        "📝 Submit Civic Complaint"
     )
 
     citizen_name = st.text_input(
-        "Citizen Name",
-        placeholder="Enter your name"
+        "Citizen Name"
     )
 
     location = st.text_input(
-        "Location",
-        placeholder="Enter location"
+        "Location"
     )
 
     description = st.text_area(
-        "Describe the Problem",
-        placeholder="Describe the civic issue"
+        "Describe the Problem"
     )
 
     uploaded_image = st.file_uploader(
@@ -517,11 +496,7 @@ elif page == "📝 Submit Complaint":
         type="primary"
     ):
 
-        # ---------------------------------------------
-        # VALIDATION
-        # ---------------------------------------------
-
-        if citizen_name.strip() == "":
+        if not citizen_name.strip():
 
             st.error(
                 "Please enter your name."
@@ -529,7 +504,7 @@ elif page == "📝 Submit Complaint":
 
             st.stop()
 
-        if location.strip() == "":
+        if not location.strip():
 
             st.error(
                 "Please enter the location."
@@ -537,7 +512,7 @@ elif page == "📝 Submit Complaint":
 
             st.stop()
 
-        if description.strip() == "":
+        if not description.strip():
 
             st.error(
                 "Please describe the problem."
@@ -552,10 +527,6 @@ elif page == "📝 Submit Complaint":
             )
 
             st.stop()
-
-        # ---------------------------------------------
-        # READ IMAGE
-        # ---------------------------------------------
 
         image_bytes = np.asarray(
             bytearray(
@@ -572,14 +543,10 @@ elif page == "📝 Submit Complaint":
         if image is None:
 
             st.error(
-                "Invalid image."
+                "Invalid image file."
             )
 
             st.stop()
-
-        # ---------------------------------------------
-        # AI DETECTION
-        # ---------------------------------------------
 
         try:
 
@@ -599,17 +566,9 @@ elif page == "📝 Submit Complaint":
 
             st.stop()
 
-        # ---------------------------------------------
-        # DEPARTMENT
-        # ---------------------------------------------
-
         department = assign_department(
             detected_issue
         )
-
-        # ---------------------------------------------
-        # PRIORITY
-        # ---------------------------------------------
 
         priority = calculate_priority(
             detected_issue,
@@ -623,10 +582,6 @@ elif page == "📝 Submit Complaint":
             )
         )
 
-        # ---------------------------------------------
-        # COMPLAINT ID
-        # ---------------------------------------------
-
         complaint_id = (
             generate_complaint_id()
         )
@@ -636,10 +591,6 @@ elif page == "📝 Submit Complaint":
                 "%Y-%m-%d %H:%M:%S"
             )
         )
-
-        # ---------------------------------------------
-        # COMPLAINT DATA
-        # ---------------------------------------------
 
         complaint_data = {
 
@@ -680,27 +631,17 @@ elif page == "📝 Submit Complaint":
                 submitted_at
         }
 
-        # ---------------------------------------------
-        # SAVE
-        # ---------------------------------------------
-
         save_complaint(
             complaint_data
         )
-
-        # ---------------------------------------------
-        # RESULT
-        # ---------------------------------------------
 
         st.success(
             "✅ Complaint submitted successfully!"
         )
 
-        st.subheader(
-            "🤖 AI Analysis"
+        col1, col2, col3 = (
+            st.columns(3)
         )
-
-        col1, col2, col3 = st.columns(3)
 
         with col1:
 
@@ -726,24 +667,13 @@ elif page == "📝 Submit Complaint":
                 priority
             )
 
-        st.subheader(
-            "🏢 Assigned Department"
-        )
-
         st.info(
-            department
-        )
-
-        st.subheader(
-            "📊 Priority Score"
-        )
-
-        st.progress(
-            int(priority_score)
+            f"🏢 Assigned Department: "
+            f"{department}"
         )
 
         st.write(
-            f"Priority Score: "
+            f"📊 Priority Score: "
             f"**{priority_score}/100**"
         )
 
@@ -756,11 +686,11 @@ elif page == "📝 Submit Complaint":
         )
 
         st.warning(
-            "Save this Complaint ID to track your complaint."
+            "Save this Complaint ID for tracking."
         )
 
         st.info(
-            "Current Status: 🟡 Pending"
+            "🟡 Status: Pending"
         )
 
 
@@ -770,12 +700,12 @@ elif page == "📝 Submit Complaint":
 
 elif page == "🔎 Track Complaint":
 
-    st.header(
+    st.title(
         "🔎 Track Your Civic Complaint"
     )
 
     st.write(
-        "Enter your Complaint ID."
+        "Enter your Complaint ID to check the current status."
     )
 
     if not os.path.exists(CSV_PATH):
@@ -791,7 +721,7 @@ elif page == "🔎 Track Complaint":
     )
 
     complaint_id = st.text_input(
-        "Complaint ID",
+        "Enter Complaint ID",
         placeholder="CIVIC-2026-1234"
     )
 
@@ -804,7 +734,7 @@ elif page == "🔎 Track Complaint":
             complaint_id.strip()
         )
 
-        if complaint_id == "":
+        if not complaint_id:
 
             st.error(
                 "Please enter Complaint ID."
@@ -815,6 +745,7 @@ elif page == "🔎 Track Complaint":
             result = data[
                 data["Complaint_ID"]
                 .astype(str)
+                .str.strip()
                 .str.upper()
                 ==
                 complaint_id.upper()
@@ -834,48 +765,60 @@ elif page == "🔎 Track Complaint":
                     "✅ Complaint found!"
                 )
 
+                col1, col2 = (
+                    st.columns(2)
+                )
+
+                with col1:
+
+                    st.write(
+                        f"**Complaint ID:** "
+                        f"{complaint['Complaint_ID']}"
+                    )
+
+                    st.write(
+                        f"**Citizen:** "
+                        f"{complaint['Citizen_Name']}"
+                    )
+
+                    st.write(
+                        f"**Location:** "
+                        f"{complaint['Location']}"
+                    )
+
+                    st.write(
+                        f"**Issue:** "
+                        f"{str(complaint['Issue']).replace('_', ' ').title()}"
+                    )
+
+                with col2:
+
+                    st.write(
+                        f"**Department:** "
+                        f"{complaint['Department']}"
+                    )
+
+                    st.write(
+                        f"**Priority:** "
+                        f"{complaint['Priority']}"
+                    )
+
+                    st.write(
+                        f"**Priority Score:** "
+                        f"{complaint['Priority_Score']}"
+                    )
+
+                    st.write(
+                        f"**Submitted:** "
+                        f"{complaint['Submitted_At']}"
+                    )
+
                 st.subheader(
-                    "📋 Complaint Details"
+                    "📝 Description"
                 )
 
                 st.write(
-                    f"**Complaint ID:** "
-                    f"{complaint['Complaint_ID']}"
-                )
-
-                st.write(
-                    f"**Citizen:** "
-                    f"{complaint['Citizen_Name']}"
-                )
-
-                st.write(
-                    f"**Location:** "
-                    f"{complaint['Location']}"
-                )
-
-                st.write(
-                    f"**Issue:** "
-                    f"{str(complaint['Issue']).replace('_', ' ').title()}"
-                )
-
-                st.write(
-                    f"**Department:** "
-                    f"{complaint['Department']}"
-                )
-
-                st.write(
-                    f"**Priority:** "
-                    f"{complaint['Priority']}"
-                )
-
-                st.write(
-                    f"**Priority Score:** "
-                    f"{complaint['Priority_Score']}"
-                )
-
-                st.write(
-                    f"**Description:** "
-                    f"{complaint['Description']}"
+                    complaint["Description"]
                 )
 
                 st.divider()
@@ -886,13 +829,13 @@ elif page == "🔎 Track Complaint":
 
                 status = str(
                     complaint["Status"]
-                )
+                ).strip()
 
                 if status == "Pending":
 
                     st.warning(
                         "🟡 Pending – "
-                        "Complaint received."
+                        "Complaint has been received."
                     )
 
                 elif status == "In Progress":
@@ -922,18 +865,13 @@ elif page == "🔎 Track Complaint":
 
 elif page == "🏢 Department Dashboard":
 
-    st.header(
+    st.title(
         "🏢 Department Dashboard"
     )
 
     st.write(
-        "Authorized departments can view and update "
-        "their assigned complaints."
+        "Department officials can view and update complaints."
     )
-
-    # -----------------------------------------------------
-    # CHECK DATABASE
-    # -----------------------------------------------------
 
     if not os.path.exists(CSV_PATH):
 
@@ -946,10 +884,6 @@ elif page == "🏢 Department Dashboard":
     data = pd.read_csv(
         CSV_PATH
     )
-
-    # -----------------------------------------------------
-    # LOGIN
-    # -----------------------------------------------------
 
     st.subheader(
         "🔐 Department Login"
@@ -965,15 +899,6 @@ elif page == "🏢 Department Dashboard":
         type="password",
         key="dept_password"
     )
-
-    login_button = st.button(
-        "🔐 Login",
-        key="dept_login"
-    )
-
-    # -----------------------------------------------------
-    # LOGIN CREDENTIALS
-    # -----------------------------------------------------
 
     credentials = {
 
@@ -1013,11 +938,10 @@ elif page == "🏢 Department Dashboard":
         )
     }
 
-    # -----------------------------------------------------
-    # LOGIN PROCESS
-    # -----------------------------------------------------
-
-    if login_button:
+    if st.button(
+        "🔐 Login",
+        key="login_button"
+    ):
 
         if username not in credentials:
 
@@ -1025,38 +949,52 @@ elif page == "🏢 Department Dashboard":
                 "❌ Invalid username."
             )
 
-        elif password != credentials[username][0]:
+            st.session_state[
+                "logged_in"
+            ] = False
+
+        elif password != credentials[
+            username
+        ][0]:
 
             st.error(
                 "❌ Incorrect password."
             )
 
+            st.session_state[
+                "logged_in"
+            ] = False
+
         else:
 
             st.session_state[
-                "department_logged_in"
+                "logged_in"
             ] = True
 
             st.session_state[
-                "department_name"
-            ] = credentials[username][1]
+                "department"
+            ] = credentials[
+                username
+            ][1]
 
             st.success(
                 "✅ Login successful!"
             )
 
     # -----------------------------------------------------
-    # DASHBOARD AFTER LOGIN
+    # LOGGED IN DASHBOARD
     # -----------------------------------------------------
 
     if st.session_state.get(
-        "department_logged_in",
+        "logged_in",
         False
     ):
 
-        department = st.session_state[
-            "department_name"
-        ]
+        department = (
+            st.session_state[
+                "department"
+            ]
+        )
 
         st.divider()
 
@@ -1064,19 +1002,21 @@ elif page == "🏢 Department Dashboard":
             f"🏢 {department}"
         )
 
-        # -------------------------------------------------
-        # FILTER COMPLAINTS
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # GET CURRENT DATA FROM CSV
+        # ---------------------------------------------
+
+        data = pd.read_csv(
+            CSV_PATH
+        )
 
         department_data = data[
-            data["Department"].astype(str)
+            data["Department"]
+            .astype(str)
+            .str.strip()
             ==
             department
         ].copy()
-
-        # -------------------------------------------------
-        # STATISTICS
-        # -------------------------------------------------
 
         total = len(
             department_data
@@ -1084,35 +1024,43 @@ elif page == "🏢 Department Dashboard":
 
         pending = len(
             department_data[
-                department_data["Status"]
+                department_data[
+                    "Status"
+                ]
                 .astype(str)
-                .str.lower()
+                .str.strip()
                 ==
-                "pending"
+                "Pending"
             ]
         )
 
         in_progress = len(
             department_data[
-                department_data["Status"]
+                department_data[
+                    "Status"
+                ]
                 .astype(str)
-                .str.lower()
+                .str.strip()
                 ==
-                "in progress"
+                "In Progress"
             ]
         )
 
         resolved = len(
             department_data[
-                department_data["Status"]
+                department_data[
+                    "Status"
+                ]
                 .astype(str)
-                .str.lower()
+                .str.strip()
                 ==
-                "resolved"
+                "Resolved"
             ]
         )
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4 = (
+            st.columns(4)
+        )
 
         with col1:
 
@@ -1144,9 +1092,9 @@ elif page == "🏢 Department Dashboard":
 
         st.divider()
 
-        # -------------------------------------------------
+        # ---------------------------------------------
         # COMPLAINT LIST
-        # -------------------------------------------------
+        # ---------------------------------------------
 
         st.subheader(
             "📋 Assigned Complaints"
@@ -1155,42 +1103,22 @@ elif page == "🏢 Department Dashboard":
         if department_data.empty:
 
             st.info(
-                "No complaints are assigned "
+                "No complaints assigned "
                 "to this department."
             )
 
         else:
 
-            display_columns = [
-
-                "Complaint_ID",
-                "Citizen_Name",
-                "Location",
-                "Issue",
-                "Priority",
-                "Priority_Score",
-                "Status"
-            ]
-
-            available_columns = [
-
-                column
-                for column in display_columns
-                if column in department_data.columns
-            ]
-
             st.dataframe(
-                department_data[
-                    available_columns
-                ],
+                department_data,
                 use_container_width=True
             )
 
             st.divider()
 
-            # -------------------------------------------------
+            # -----------------------------------------
             # UPDATE STATUS
-            # -------------------------------------------------
+            # -----------------------------------------
 
             st.subheader(
                 "🔄 Update Complaint Status"
@@ -1201,91 +1129,166 @@ elif page == "🏢 Department Dashboard":
                     "Complaint_ID"
                 ]
                 .astype(str)
+                .str.strip()
                 .tolist()
             )
 
-            selected_complaint = st.selectbox(
+            selected_id = st.selectbox(
                 "Select Complaint ID",
                 complaint_ids,
-                key="selected_complaint_id"
+                key="selected_complaint"
             )
 
-            # Find selected complaint
-
-            selected_row = department_data[
-                department_data["Complaint_ID"]
+            selected_rows = data[
+                data["Complaint_ID"]
                 .astype(str)
+                .str.strip()
                 ==
-                selected_complaint
+                selected_id
             ]
 
-            current_status = str(
-                selected_row.iloc[0]["Status"]
-            )
+            if not selected_rows.empty:
 
-            st.write(
-                f"**Current Status:** "
-                f"{current_status}"
-            )
+                current_status = str(
+                    selected_rows.iloc[0][
+                        "Status"
+                    ]
+                ).strip()
 
-            new_status = st.selectbox(
-                "Change Status To",
-                [
+                st.write(
+                    f"Current Status: "
+                    f"**{current_status}**"
+                )
+
+                status_options = [
                     "Pending",
                     "In Progress",
                     "Resolved"
-                ],
-                key="change_status"
-            )
+                ]
 
-            if st.button(
-                "💾 Update Status",
-                type="primary",
-                key="save_status"
-            ):
-
-                # Update dataframe
-
-                data.loc[
-                    data["Complaint_ID"]
-                    .astype(str)
-                    ==
-                    selected_complaint,
-                    "Status"
-                ] = new_status
-
-                # Save CSV
-
-                data.to_csv(
-                    CSV_PATH,
-                    index=False
+                new_status = st.selectbox(
+                    "Select New Status",
+                    status_options,
+                    index=status_options.index(
+                        current_status
+                    )
+                    if current_status
+                    in status_options
+                    else 0,
+                    key="new_status"
                 )
 
-                st.success(
-                    f"✅ {selected_complaint} "
-                    f"status changed to "
-                    f"'{new_status}'."
-                )
+                if st.button(
+                    "💾 Update Status",
+                    type="primary",
+                    key="update_status_button"
+                ):
 
-                st.rerun()
+                    # ---------------------------------
+                    # UPDATE DATAFRAME
+                    # ---------------------------------
 
-        # -------------------------------------------------
-        # LOGOUT
-        # -------------------------------------------------
+                    mask = (
+                        data[
+                            "Complaint_ID"
+                        ]
+                        .astype(str)
+                        .str.strip()
+                        ==
+                        selected_id
+                    )
+
+                    data.loc[
+                        mask,
+                        "Status"
+                    ] = new_status
+
+                    # ---------------------------------
+                    # SAVE TO CSV
+                    # ---------------------------------
+
+                    data.to_csv(
+                        CSV_PATH,
+                        index=False
+                    )
+
+                    # ---------------------------------
+                    # VERIFY SAVE
+                    # ---------------------------------
+
+                    verify_data = pd.read_csv(
+                        CSV_PATH
+                    )
+
+                    verify_row = (
+                        verify_data[
+                            verify_data[
+                                "Complaint_ID"
+                            ]
+                            .astype(str)
+                            .str.strip()
+                            ==
+                            selected_id
+                        ]
+                    )
+
+                    if not verify_row.empty:
+
+                        saved_status = str(
+                            verify_row.iloc[0][
+                                "Status"
+                            ]
+                        ).strip()
+
+                        if (
+                            saved_status
+                            ==
+                            new_status
+                        ):
+
+                            st.success(
+                                f"✅ Complaint "
+                                f"{selected_id} "
+                                f"updated successfully "
+                                f"to **{new_status}**."
+                            )
+
+                            st.session_state[
+                                "last_updated_status"
+                            ] = new_status
+
+                            st.rerun()
+
+                        else:
+
+                            st.error(
+                                "❌ Status verification failed."
+                            )
+
+                    else:
+
+                        st.error(
+                            "❌ Complaint ID not found "
+                            "after saving."
+                        )
 
         st.divider()
 
+        # ---------------------------------------------
+        # LOGOUT
+        # ---------------------------------------------
+
         if st.button(
             "🚪 Logout",
-            key="logout"
+            key="logout_button"
         ):
 
             st.session_state[
-                "department_logged_in"
+                "logged_in"
             ] = False
 
             st.session_state[
-                "department_name"
+                "department"
             ] = ""
 
             st.rerun()
@@ -1297,7 +1300,7 @@ elif page == "🏢 Department Dashboard":
 
 elif page == "ℹ️ About Project":
 
-    st.header(
+    st.title(
         "ℹ️ About the Project"
     )
 
@@ -1307,16 +1310,21 @@ elif page == "ℹ️ About Project":
 
     st.write(
         """
-        This project provides an AI-based platform for
-        reporting and managing civic issues.
+        The AI Civic Issue Management System is designed
+        to make civic complaint management easier and
+        more efficient.
 
-        Citizens can upload an image of a civic problem.
-        The machine-learning model identifies the issue,
-        calculates priority and assigns it to the relevant
-        government department.
+        Citizens can upload an image of a civic issue.
+        The AI model identifies the issue and calculates
+        its priority.
 
-        Citizens can then track the complaint using a
-        unique Complaint ID.
+        The system automatically assigns the complaint
+        to the appropriate department.
+
+        A unique Complaint ID is generated for tracking.
+
+        Department officials can log in and update the
+        complaint status.
         """
     )
 
@@ -1328,15 +1336,15 @@ elif page == "ℹ️ About Project":
 
     st.write(
         """
-        • Detect civic issues from images
+        • Detect civic issues using images
 
-        • Prioritize complaints
+        • Classify the issue using machine learning
+
+        • Calculate complaint priority
 
         • Automatically assign departments
 
-        • Generate Complaint IDs
-
-        • Store complaint information
+        • Generate unique Complaint IDs
 
         • Allow citizens to track complaints
 
@@ -1345,36 +1353,33 @@ elif page == "ℹ️ About Project":
     )
 
     st.subheader(
-        "🤖 Machine Learning"
-    )
-
-    if model is not None:
-
-        st.success(
-            "Random Forest image classification model loaded."
-        )
-
-        st.write(
-            f"Model features: "
-            f"{model.n_features_in_}"
-        )
-
-    else:
-
-        st.error(
-            "AI model not found."
-        )
-
-    st.subheader(
         "🛠️ Technologies Used"
     )
 
     st.write(
         """
-        Python, Streamlit, OpenCV, Scikit-image,
-        Scikit-learn, Pandas, NumPy and Joblib.
+        Python
+        Streamlit
+        OpenCV
+        Scikit-learn
+        Scikit-image
+        Pandas
+        NumPy
+        Joblib
         """
     )
+
+    if model is not None:
+
+        st.success(
+            "🤖 AI model loaded successfully."
+        )
+
+    else:
+
+        st.error(
+            "❌ AI model not found."
+        )
 
 
 # =========================================================
@@ -1384,6 +1389,5 @@ elif page == "ℹ️ About Project":
 st.divider()
 
 st.caption(
-    "🏙️ AI Civic Issue Management System | "
-    "AI + Machine Learning + Computer Vision"
+    "🏙️ AI Civic Issue Management System"
 )
